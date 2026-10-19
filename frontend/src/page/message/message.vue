@@ -1,41 +1,181 @@
 <template>
-  <section class="quick-access-container">
-    <h1>信息快速查询</h1>
-    <p class="external-note">历史项目收录的校园服务入口，点击后在新窗口打开。部分服务需要校园网络或统一身份认证，地址可能调整。</p>
-    <div class="quick-access-grid">
-      <a v-for="item in entries" :key="item.label" :href="item.url" target="_blank" rel="noopener noreferrer" class="quick-access-item" :style="{ background: item.color }">
-        <span class="entry-symbol" aria-hidden="true">{{ item.label[0] }}</span>
-        <h2>{{ item.label }} <span aria-hidden="true">↗</span></h2>
-      </a>
+    <div class="page-content-insidebox scroll" id="page-content">
+      <!-- 快速查询模块 -->
+      <div class="quick-access-container">
+        <el-row>
+          <el-col :span="24">
+            <h2 class="section-title">信息快速查询</h2>
+          </el-col>
+        </el-row>
+  
+        <el-row :gutter="20">
+          <el-col
+            v-for="(item, index) in quickAccessItems"
+            :key="index"
+            :xs="24"
+            :sm="12"
+            :md="8"
+            :lg="6"
+          >
+            <el-card
+              class="quick-access-item"
+              :class="item.bgColor"
+              @click="handleItemClick(item)"
+            >
+              <div class="item-content">
+                <i :class="item.icon"></i>
+                <h3>{{ item.label }}</h3>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
     </div>
-  </section>
-</template>
+  </template>
+  
+  <script setup>
+  import { ref } from 'vue';
+  
+  // 快速查询模块数据
+  const quickAccessItems = ref([
+     { label: '山威主页', icon: 'fa fa-graduation-cap', bgColor: 'bg-gold', url: 'https://www.wh.sdu.edu.cn/' },
+     { label: '信息服务', icon: 'fa fa-calendar-alt', bgColor: 'bg-blue', url: 'https://service.sdu.edu.cn/tp_up/view?m=up' },
+     { label: '自习室查询', icon: 'fa fa-chalkboard', bgColor: 'bg-green', url: 'http://msg.wh.sdu.edu.cn:9008/free-classroom-select.html;jsessionid=BEB4A3D5F779A9964279A97D8B0ECEDA' },
+     { label: '图书馆预约', icon: 'fa fa-book-open', bgColor: 'bg-red', url: 'https://libseat.sdu.edu.cn/home/web/seat/area/156' },
+     { label: '校园指南', icon: 'fa fa-bus-alt', bgColor: 'bg-purple', url: 'https://pd.qq.com/s/q6krhqej?shareSource=5&businessType=2' },
+     { label: '志愿学时', icon: 'fa fa-file-alt', bgColor: 'bg-orange', url: 'http://222.194.64.76/index.jsp' },
+     { label: '学院官网', icon: 'fa fa-university', bgColor: 'bg-dark', url: 'https://math.wh.sdu.edu.cn/' },
+     { label: '培养方案', icon: 'fa fa-file-alt', bgColor: 'bg-teal', url: 'https://math.wh.sdu.edu.cn/info/1360/26723.htm' },
+     { label: '空调电费', icon: 'fa fa-bolt', bgColor: 'bg-pink', url: 'https://gyktgd.wh.sdu.edu.cn/dianbiao/AuthServlet.se' },
+     { label: '新闻资讯', icon: 'fa fa-newspaper', bgColor: 'bg-cyan', url: 'https://math.wh.sdu.edu.cn/xyxw.htm' },
+     { label: '通知公告', icon: 'fa fa-calendar-check', bgColor: 'bg-lime', url: 'https://math.wh.sdu.edu.cn/tzgg.htm' },
+     { label: '失物招领', icon: 'fa fa-graduation-cap', bgColor: 'bg-indigo', url: 'https://msg.wh.sdu.edu.cn/index.html' },
+  ]);
+  
+  // 点击事件处理
+  const handleItemClick = (item) => {
+    console.log('访问模块:', item.label);
+    if (item.url) {
+      window.open(item.url, '_blank');
+    }
+  };
+  </script>
+  
+  <style scoped>
+/* 快速查询样式 */
+.quick-access-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-<script setup>
-const entries = [
-  { label: '山威主页', color: '#f8d68d', url: 'https://www.wh.sdu.edu.cn/' },
-  { label: '信息服务', color: '#82c7d0', url: 'https://service.sdu.edu.cn/tp_up/view?m=up' },
-  { label: '自习室查询', color: '#a1d99e', url: 'http://msg.wh.sdu.edu.cn:9008/free-classroom-select.html' },
-  { label: '图书馆预约', color: '#fbb7b1', url: 'https://libseat.sdu.edu.cn/home/web/seat/area/156' },
-  { label: '学院官网', color: '#e0e0e0', url: 'https://math.wh.sdu.edu.cn/' },
-  { label: '培养方案', color: '#8ac5c5', url: 'https://math.wh.sdu.edu.cn/info/1360/26723.htm' },
-  { label: '空调电费', color: '#f7a0b6', url: 'https://gyktgd.wh.sdu.edu.cn/dianbiao/AuthServlet.se' },
-  { label: '新闻资讯', color: '#a1e2e2', url: 'https://math.wh.sdu.edu.cn/xyxw.htm' },
-  { label: '通知公告', color: '#d7f1a1', url: 'https://math.wh.sdu.edu.cn/tzgg.htm' },
-  { label: '失物招领', color: '#9fa2d8', url: 'https://msg.wh.sdu.edu.cn/index.html' },
-]
-</script>
+.section-title {
+  color: #333;
+  font-size: 28px; /* 字体更大 */
+  border-bottom: 2px solid #c4a267;
+  padding-bottom: 10px;
+  margin-bottom: 30px;
+}
 
-<style scoped>
-.quick-access-container { padding: 32px 5%; max-width: 1200px; margin: 0 auto; }
-h1 { color: #254b70; font-size: 28px; border-bottom: 2px solid #c4a267; padding-bottom: 14px; }
-.external-note { font-size: 13px; color: #64748b; margin-bottom: 28px; line-height: 1.7; }
-.quick-access-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-.quick-access-item { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; border-radius: 12px; color: #334155; text-align: center; text-decoration: none; min-height: 120px; box-shadow: 0 4px 6px #00000014; transition: transform .2s; }
-.quick-access-item:hover { transform: translateY(-4px); }
-.entry-symbol { display: grid; place-items: center; height: 48px; width: 48px; border-radius: 16px; background: #ffffff70; font-size: 26px; }
-h2 { margin: 16px 0 0; font-size: 16px; }
-@media (max-width: 1100px) { .quick-access-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 800px) { .quick-access-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
-@media (max-width: 480px) { .quick-access-grid { grid-template-columns: 1fr; } }
-</style>
+.quick-access-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15px; /* 更小的内边距 */
+  border-radius: 8px; /* 边角更圆润 */
+  color: white;
+  text-align: center;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  min-height: 120px; /* 方块高度变小 */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.quick-access-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.quick-access-item i {
+  font-size: 3em; /* 图标变大 */
+  margin-bottom: 10px;
+}
+
+.item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 马卡龙色系 */
+.bg-gold { background-color: #f8d68d; }
+.bg-blue { background-color: #82c7d0; }
+.bg-green { background-color: #a1d99e; }
+.bg-red { background-color: #fbb7b1; }
+.bg-purple { background-color: #d4bde7; }
+.bg-orange { background-color: #ffd478; }
+.bg-teal { background-color: #8ac5c5; }
+.bg-pink { background-color: #f7a0b6; }
+.bg-dark { background-color: #e0e0e0; }
+.bg-cyan { background-color: #a1e2e2; }
+.bg-lime { background-color: #d7f1a1; }
+.bg-indigo { background-color: #9fa2d8; }
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .quick-access-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .quick-access-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quick-access-item {
+    padding: 10px;
+    min-height: 100px; /* 更小的高度 */
+  }
+
+  .quick-access-item i {
+    font-size: 2.5em; /* 图标适应 */
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-access-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+  /* 响应式设计 */
+  @media (max-width: 1024px) {
+    .quick-access-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .quick-access-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  
+    .quick-access-item {
+      padding: 15px;
+      min-height: 120px;
+    }
+  
+    .quick-access-item i {
+      font-size: 2em;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .quick-access-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  </style>

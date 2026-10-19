@@ -1,0 +1,16 @@
+# Keep the original 2024/2025 LangChain import paths and implementation.
+fastapi>=0.115,<0.116
+uvicorn>=0.30,<0.35
+openai>=1.57,<2
+PyMySQL>=1.1,<2
+python-multipart>=0.0.20,<1
+python-dotenv>=1.0,<2
+requests>=2.32.4,<3
+urllib3>=2.2,<3
+pytz>=2024.2
+SQLAlchemy>=2.0,<2.1
+langchain>=0.3,<0.4
+langchain-community>=0.3,<0.4
+langchain-huggingface>=0.1,<0.2
+sentence-transformers>=3.3,<4
+faiss-cpu>=1.9,<2

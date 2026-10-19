@@ -42,6 +42,9 @@ build/
 backend/data/
 backend/models/
 backend/knowledge/local/
+backend/m3e-small/
+backend/linces/
+backend/camp/
 
 # Editors and operating systems
 .idea/

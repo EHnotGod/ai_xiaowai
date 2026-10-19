@@ -17,6 +17,12 @@ const routes = [{
             component:()=>import("@/page/map/index.vue")
         },
         {
+            //投诉界面
+            path:"/index",
+            name:"complainPage",
+            component:()=>import("@/page/complainPage/index.vue")
+        },
+        {
             //信息界面
             path:"/message",
             name:"message",
@@ -29,7 +35,7 @@ const routes = [{
             component:()=>import("@/page/we/we.vue")
         },
     ]
-}, { path: '/:pathMatch(.*)*', redirect: '/' }
+}
 ]
 
 const router = createRouter({

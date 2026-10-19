@@ -1,93 +1,88 @@
+import { API_BASE_URL } from '@/api/config.js';
 import { defineStore } from 'pinia'
-import { apiFetch } from './client.js'
-import { readChatStream } from './stream.js'
-import { userInformation } from './user.js'
-
-let activeRequest = null
-
-function readPicture(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(new Error('图片读取失败，请重新选择。'))
-    reader.readAsDataURL(file)
-  })
-}
-
+import { v4 as uuidv4 } from 'uuid';
+import { userInformation } from '@/api/user.js';
+const UserStore = userInformation();
 export const useChatStore = defineStore('chat', {
-  state: () => ({ converId: '', chatHistory: [], busy: false, loading: false }),
+  state: () => ({
+    userMessage: '',    // 用户输入的消息
+    aiResponse: '',     // AI 回复的内容
+    converId: '',       // 会话 ID
+    loading: false,     // 加载状态
+    firstRequest: false,// 是否是第一次请求
+	  chatHistory:[],     //历史记录
+    picHistory:[],
+    is_imggg:false,
+    is_web:false
+  }),
+
   actions: {
-    reset() {
-      activeRequest?.abort()
-      activeRequest = null
-      this.$reset()
-    },
-    loadConversation(sessionId, messages) {
-      this.reset()
-      this.converId = sessionId
-      this.chatHistory = messages.map((message) => ({ ...message }))
-    },
-    async chat(text, picture = null) {
-      if (this.busy) return
-      if (!userInformation().is_login) throw new Error('请先登录后再开始对话。')
-      const controller = new AbortController()
-      activeRequest = controller
-      const isCurrent = () => activeRequest === controller && !controller.signal.aborted
-      this.busy = true
-      this.loading = true
-      let replyIndex = -1
-      try {
-        let pictureData = ''
-        if (picture) {
-          pictureData = await readPicture(picture)
-          if (!isCurrent()) return
-          const upload = new FormData()
-          upload.append('file', picture)
-          const query = this.converId ? `?con_id=${encodeURIComponent(this.converId)}` : ''
-          const uploaded = await apiFetch(`/upload${query}`, {
-            method: 'POST', body: upload, signal: controller.signal,
-          })
-          const conversationId = await uploaded.json()
-          if (!isCurrent()) return
-          this.converId = conversationId
+    async chat() {
+        if (this.converId===""){
+            const newUuid = uuidv4();
+            this.converId = newUuid;
+            console.log("已生成对话编号：",newUuid);  // 打印生成的 UUID
         }
-        if (!isCurrent()) return
-        this.chatHistory.push({ type: 'user', content: text, picture: pictureData })
-        replyIndex = this.chatHistory.push({ type: 'ai', content: '' }) - 1
-        const response = await apiFetch('/sdk_run', {
-          json: { text, con_id: this.converId || null, imggg: Boolean(picture), iswifi: false },
-          signal: controller.signal,
-        })
-        if (!isCurrent()) {
-          await response.body?.cancel()
-          return
+        this.loading = true;
+        const bodyData = {
+            text: this.userMessage,
+            con_id: this.converId,
+            imggg:this.is_imggg,
+            username:UserStore.username,
+            history:this.chatHistory,
+            pichistory:this.picHistory,
+            iswifi:this.is_web
+        };
+        try {
+        const response = await fetch(`${API_BASE_URL}/sdk_run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(bodyData)
+        });
+            // 确保响应正常
+        if (!response.ok) {
+            throw new Error('网络响应失败');
         }
-        let completed = false
-        await readChatStream(response.body, (event) => {
-          if (!isCurrent()) return
-          if (event.con_id) this.converId = event.con_id
-          if (typeof event.response === 'string') {
-            this.chatHistory[replyIndex].content += event.response
-            this.loading = false
+        // 获取响应的可读流
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();  // 用于解码流中的文本
+        let done = false;
+        let content = '';
+        while (!done) {
+            const { value, done: doneReading } = await reader.read();
+            done = doneReading;
+            this.loading = false;
+            // 解码当前块并处理 JSON
+            const chunks = decoder.decode(value, { stream: true });
+            const lines = chunks.split("\n");
+            for (let i = 0; i < lines.length - 1; i++){
+              const chunk = lines[i];
+              try {
+                // 尝试解析 JSON 数据
+                const jsonData = JSON.parse(chunk);
+                if (jsonData && jsonData.response) {
+                  // 拼接 content
+                  content += jsonData.response;
+                  this.aiResponse = content; // 更新 UI
+                  this.chatHistory[this.chatHistory.length - 1].content = this.aiResponse;
+                }
+              } catch (e) {
+              }
+            }
+            
           }
-          if (event.done) completed = true
-        })
-        if (!isCurrent()) return
-        if (!completed) throw new Error('连接已中断，回复可能不完整，请稍后重试。')
-      } catch (error) {
-        if (isCurrent() && error.name !== 'AbortError') {
-          if (replyIndex >= 0 && this.chatHistory[replyIndex]) {
-            this.chatHistory[replyIndex].error = error.message
-          }
-          throw error
-        }
+        
+        console.log("AI 回复:", this.aiResponse);  // 打印 AI 回复
+        console.log("历史记录:", this.chatHistory)
+      } catch (err) {
+        console.error('请求失败', err);
+        this.aiResponse = '请求失败'; // 失败时设置 AI 回复为 '请求失败'
       } finally {
-        if (activeRequest === controller) {
-          this.busy = false
-          this.loading = false
-          activeRequest = null
-        }
+        this.loading = false; // 完成加载
+        this.userMessage = ""
       }
     },
-  },
+  }
 })

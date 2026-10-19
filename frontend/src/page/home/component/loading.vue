@@ -10,11 +10,10 @@
 
 </script>
 
-<style scoped>
+<style lang="less" scoped>
     .circle-container{
         display:flex;
         align-items: center;
-    }
         .circle {
             width:7px;
             height:7px;
@@ -32,6 +31,7 @@
         .circle:nth-child(3){
             animation-delay:0.67s;
         }
+    }
     @keyframes colohange {
             0% {
                 background-color: #92abe4;
@@ -42,6 +42,7 @@
             66.67% {
                 background-color: #92abe4;
             }
-
+            
         }
 </style>
+

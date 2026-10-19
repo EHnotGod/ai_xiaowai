@@ -1,77 +1,182 @@
 <template>
-  <div class="input-box-area">
-    <el-input v-model="text" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :maxlength="8000" show-word-limit resize="none" :disabled="chat.busy" placeholder="请输入你想了解的校园问题（Ctrl + Enter 发送）" @keydown.ctrl.enter.prevent="send" />
-    <div v-if="picture" class="attachment">已选图片：{{ picture.name }}<el-button link :disabled="chat.busy" @click="picture = null">移除</el-button></div>
-    <div class="functions">
-      <el-button :disabled="chat.busy" @click="newConversation">＋ 新建对话</el-button>
-      <el-tooltip content="原联网查询与天气服务未随项目提供，当前未启用。"><span class="feature-note">联网查询未配置</span></el-tooltip>
-      <div class="send-actions">
-        <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="file-input" @change="selectPicture" />
-        <el-button :disabled="chat.busy || !user.is_login" aria-label="添加图片" @click="fileInput.click()">▧ 图片</el-button>
-        <el-button type="primary" :loading="chat.busy" :disabled="!text.trim() || !user.is_login" @click="send">发送 ↑</el-button>
+    <div class="input-box-area">
+      <div class="input-box">
+        <el-input
+          v-model="textarea"
+          maxlength="300"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          placeholder="请输入任何你想问的问题！"
+          show-word-limit
+          width:auto
+          resize="none"
+          type="textarea"
+        />
+      </div>
+      <div class="functions-imgs">
+        <el-tooltip content="新建对话" placement="right">
+        <img src="../../../assets/static/new.png" alt="清除" @click="clearText" class="qingchu-img"></img>
+      </el-tooltip>
+        <el-switch v-model="chatStore.is_web" active-text="联网查询" inactive-text="关闭" class="web-search" />
+        <div class="youce-img">
+          <el-upload
+            accept='image/jpeg,image/gif,image/png,image/jpg'
+            class="upload-img-button"
+            :action="`${API_BASE_URL}/upload`"
+            method="post"
+            list-type="picture"
+            limit=1
+            v-model:file-list="fileList"
+            :data="{ con_id: chatStore.converId }"
+            :on-success="UploadSuccess"
+          >
+          <el-tooltip content="上传图片" placement="left">
+            <img 
+              src="../../../assets/static/pic.png" 
+              alt="上传图片"
+              class="send-button-upload-img" 
+            />
+          </el-tooltip>
+          </el-upload>
+          <el-tooltip content="发送" placement="right">
+          <img 
+            src="../../../assets/static/fasong.png"
+            alt="发送" 
+            @click="sendText" 
+            class="send-button" 
+            :class="{'sending': isSending, 'sending-back': isSendingBack}"
+          />
+        </el-tooltip>
+        </div>
       </div>
     </div>
-    <small v-if="!user.is_login" class="login-hint">请先从左侧登录或注册；对话记录仅对当前账号可见。</small>
-  </div>
-</template>
-
+  </template>
+  
 <script setup>
-import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { useChatStore } from '@/api/counter.js'
-import { userInformation } from '@/api/user.js'
-
-const chat = useChatStore()
-const user = userInformation()
-const text = ref('')
-const picture = ref(null)
-const fileInput = ref(null)
-watch(() => user.access_token, () => {
-  text.value = ''
-  picture.value = null
-})
-
-function newConversation() {
-  chat.reset()
-  text.value = ''
-  picture.value = null
+import { API_BASE_URL } from '@/api/config.js';
+import { ref } from 'vue'
+import { useChatStore } from '@/api/counter.js';
+const switchValue = ref('')
+const chatStore = useChatStore();
+const textarea = ref('')
+const isSending = ref(false)  // 控制按钮飞出的动画状态
+const isSendingBack = ref(false)  // 控制按钮飞回的动画状态
+const fileList = ref([]);
+// 清除输入框内容
+const clearText = () => {
+  chatStore.converId = "";
+  chatStore.chatHistory = [];
+  chatStore.picHistory = [];
+  chatStore.loading = false;
+  chatStore.aiResponse = "";
+  chatStore.userMessage = "";
+  textarea.value = ''
 }
-function selectPicture(event) {
-  const file = event.target.files[0]
-  event.target.value = ''
-  if (!file) return
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
-    return ElMessage.warning('请选择 5 MB 以内的 PNG、JPEG 或 WebP 图片。')
+
+const UploadSuccess = (response) => {
+  console.log(response);
+  if (chatStore.converId === "" && response){
+    chatStore.converId = response;
   }
-  picture.value = file
 }
-async function send() {
-  if (!text.value.trim() || chat.busy) return
-  if (!user.is_login) return ElMessage.warning('请先登录后再开始对话。')
-  const prompt = text.value.trim()
-  const attachment = picture.value
-  const requestToken = user.access_token
-  text.value = ''
-  picture.value = null
-  try {
-    await chat.chat(prompt, attachment)
-  } catch (error) {
-    if (user.access_token === requestToken) {
-      text.value = prompt
-      picture.value = attachment
-      ElMessage.error(error.message)
+  
+// 发送输入框内容
+const sendText = () => {
+  if (textarea.value.trim()) {
+    const reader = new FileReader();
+
+    console.log("发送内容:", textarea.value)
+    isSending.value = true
+    chatStore.userMessage = textarea.value
+    chatStore.chatHistory.push({ type: 'user', content: chatStore.userMessage });
+    chatStore.chatHistory.push({ type: 'ai', content: "" });
+    if (fileList.value.length === 0) {
+      chatStore.is_imggg = false;
+      chatStore.picHistory.push("");
+    } else {
+      chatStore.is_imggg = true;
+      
+      // 这里需要使用 FileReader 异步读取文件
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        chatStore.picHistory.push(reader.result);  // 获取到 Base64 数据
+        console.log(chatStore.picHistory);
+      };
+      reader.onerror = (error) => {
+        console.error("文件读取失败", error);
+      };
+      reader.readAsDataURL(fileList.value[0].raw);  // 读取图片
     }
+    chatStore.chat();
+    textarea.value = ''  // 清空输入框
+    fileList.value = [];
+    console.log(fileList);
+
+    // 触发飞回动画
+    setTimeout(() => {
+      isSending.value = false
+      isSendingBack.value = true
+
+      // 清空输入框并等待动画结束后恢复状态
+      setTimeout(() => {
+        isSendingBack.value = false
+        
+      }, 200)  // 动画时长，确保飞回动画完整执行
+    }, 200)  // 飞出动画时长
   }
 }
 </script>
-
-<style scoped>
-.input-box-area { border-radius: 20px; background: #fff; padding: 12px; box-shadow: 0 6px 30px #254b7015; }
-.functions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
-.send-actions { display: flex; margin-left: auto; }
-.file-input { display: none; }
-.feature-note, .login-hint { color: #64748b; font-size: 12px; }
-.login-hint { display: block; margin-top: 10px; }
-.attachment { font-size: 13px; color: #3a71e8; padding-top: 8px; overflow-wrap: anywhere; }
-@media (max-width: 700px) { .feature-note { display: none; } .functions { gap: 8px; } }
-</style>
+  
+  <style lang="less" scoped>
+  .input-box-area {
+    border-radius: 20px;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    
+    .input-box {
+      padding: 5px;
+      justify-content: center;
+    }
+  
+    .functions-imgs {
+      display: flex;
+      justify-content: space-between;  /* 使按钮分别对齐左右两端 */
+      padding-inline: 10px;
+      padding-top: 5px;
+      .youce-img{
+        display: flex;
+        flex-direction:row;
+        gap:20px;
+      }
+      .qingchu-img, .send-button,.send-button-upload-img{
+        width: 27px;
+        height: 27px;
+        cursor: pointer;
+      }
+    }
+}
+  /* 使用 fixed 来固定输入框位置 */
+.input-box-area {
+  position: fixed;  /* 固定定位 */
+  width:calc(100% - 625px);
+  bottom: 50px;  /* 距离页面底部 20px */
+  z-index: 500;   /* 确保输入框位于页面的最上层 */
+}
+  /* 飞出并渐隐动画 */
+  .send-button {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+  
+  .send-button.sending {
+    transform: translate(50px, -50px);  /* 向右上角飞出 */
+    opacity: 0;  /* 渐隐 */
+  }
+  
+  /* 飞回并彻底渐隐 */
+  .send-button.sending-back {
+    transform: translate(-50px, 50px);  /* 从左下角飞回 */
+    opacity: 0;  /* 保持不可见 */
+  }
+  </style>
+  

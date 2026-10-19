@@ -1,104 +1,110 @@
-# 后端运行与接口
+# 原版后端运行说明
 
-这是历史项目的开源整理版。保留 FastAPI、OpenAI 兼容模型调用、校园知识检索、图片提问、账户和聊天记录。原包没有提供数据库建表脚本和依赖清单，本目录提供新的明确表结构，**不能直接连接原数据库当作迁移工具**。
+本目录以原项目七份 Python 文件为基础整理，保留原 FastAPI 路由、MySQL SQL、模型调度、内存会话和图片字典、流式返回及 FAISS 检索实现。改动限于环境变量配置、资源路径和显式建库入口。原包没有提供依赖清单或 SQL 建表文件，`requirements.in` 和 `schema.sql` 是根据原源码补充的运行资料，后者不是原数据库 DDL 的备份。
 
-推荐 Python 3.12（支持 Python 3.11+）。从项目根目录开始，在 PowerShell 中运行：
+| 原文件 | 原有用途 |
+| --- | --- |
+| `main.py` | FastAPI 接口、MySQL、聊天流及图片上传 |
+| `lang.py` | m3e-small、LangChain 切分、FAISS 建库与校园检索 |
+| `千问测试.py` | 用千问判断需要的校园、天气、时间工具 |
+| `天气查询.py` | 用千问提取城市，调用易源天气接口 |
+| `时间查询.py` | 获取北京时间和星期，原文件未改动 |
+| `联网查询.py` | 调用博查搜索并拼接网页摘要 |
+| `basehead.py` | 读取注册时使用的默认头像 |
+
+新增 `config.py` 只负责读取 `.env` 和解析本地资源路径，不包含业务替代实现。
+
+## 安装与配置
+
+使用 Python 3.12。依赖保持兼容原来的 LangChain 0.3 / `langchain-huggingface` 0.1 导入路径；模型依赖包含 PyTorch，安装体积较大。
+
+在项目根目录打开 PowerShell：
 
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
-.venv\Scripts\python.exe -m app.build_index
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-Linux / macOS：
-
-```sh
-cd backend
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-cp .env.example .env
-.venv/bin/python -m app.build_index
-.venv/bin/python -m uvicorn app.main:app --reload --port 8000
-```
-
-也可用 `uv venv --python 3.12 .venv` 创建环境。接口文档：<http://127.0.0.1:8000/docs>；健康状态：<http://127.0.0.1:8000/health>。修改 `.env` 或重建索引后请重启后端。不要提交 `.env`、`data/`、模型缓存或个人知识文档。
-
-## 配置与数据库
-
-默认使用 `backend/data/xiaowai.db`，启动时创建 `users`、`access_tokens`、`conversations` 表。开发环境无需安装 MySQL。要用 MySQL，先自行创建一个 UTF-8 数据库和专用账户，再修改 `DATABASE_URL`；格式见 `.env.example`。URL 中密码包含 `@`、`:`、`/` 等字符时须进行 URL 编码。自动建表不负责已有表的版本迁移。
-
-`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 都需要填写；选用服务商账户中实际可用的 OpenAI Chat Completions 兼容模型。图片提问要求该模型支持 `image_url`。未填写时账户、历史等接口仍可运行，聊天返回明确的 HTTP 503，健康接口的 `llm_configured` 为 `false`。这仅表示配置是否齐全，不代表服务商连通性或余额已经验证。
-
-`CORS_ORIGINS` 是逗号分隔的前端地址，默认只允许本机 5173 端口。`TOKEN_TTL_HOURS` 默认为 24；服务端时间戳以 UTC 储存并返回。其余配置见 `.env.example`。
-
-## 知识库与 RAG
-
-`knowledge/demo-campus.txt` 是原创虚构校园资料，随项目按 MIT 发布，**不代表任何真实学校规则**。如要使用真实校园资料，应先确认公开使用和再分发权限。个人本地资料请放入 `knowledge/local/`（已加入 Git 忽略，可自行创建），默认会递归检索其中的 UTF-8 `.txt`；执行 `python -m app.build_index` 更新索引。准备随开源项目公开的资料才放在其他受 Git 跟踪的知识目录，并确认其许可。也可用 `KNOWLEDGE_DIR` 指向项目外部的个人资料目录。
-
-索引使用 LangChain `Document` 和递归文本切分器，生成可检查的 JSON 文本与向量；请求时检索相关片段，连同最近对话和相应图片发送给所配置的模型服务。索引在显式运行构建命令时创建，后端导入时不会建库、下载模型或加载原包的 FAISS/pickle 文件。数据更新后需重新构建并重启服务。缺失索引时聊天返回 503，不会把未检索到的结果当作校园事实。
-
-两种检索模式的能力不同：
-
-| 模式 | 用途 | 依赖与限制 |
-| --- | --- | --- |
-| `RAG_MODE=lexical`（默认） | 无需模型下载的字符 n-gram 哈希向量演示 | 只体现字面相似度；不是原 m3e 语义模型，同义词和复杂问题效果有限 |
-| `RAG_MODE=huggingface` | 使用 LangChain HuggingFaceEmbeddings 做语义检索 | 单独安装可选依赖，首次显式建库可能下载模型，内存与磁盘开销较大 |
-
-保留原项目 m3e-small 检索思路的方法：
+请确认这里的 `python` 是 Python 3.12；也可以使用 `uv venv --python 3.12 .venv` 创建环境。`requirements.txt` 由 `requirements.in` 解析后锁定；更新时可运行：
 
 ```powershell
-.venv\Scripts\python.exe -m pip install -r requirements-rag.txt
-# 在 .env 设置 RAG_MODE=huggingface；EMBEDDING_MODEL=moka-ai/m3e-small
-.venv\Scripts\python.exe -m app.build_index
+uv pip compile --python .venv/Scripts/python.exe --output-file requirements.txt requirements.in
 ```
 
-`EMBEDDING_MODEL` 也可以指向自行取得、确认来源和许可的本地模型目录。构建阶段允许下载指定模型；服务运行期间仅从本机缓存加载，不自动下载，且关闭远程模型代码执行。改变模式或模型后必须重建索引。向量用余弦相似度在小型 JSON 索引内检索，未沿用原 FAISS 二进制索引；适用于教学规模知识库。可选模型依赖及真实服务商调用未纳入离线自动测试。
+按自己的运行环境填写 `.env`：
 
-参考：[LangChain 文本切分器](https://reference.langchain.com/python/langchain-text-splitters)、[Hugging Face 集成](https://docs.langchain.com/oss/python/integrations/embeddings/huggingfacehub)、[m3e-small 模型说明及许可](https://huggingface.co/moka-ai/m3e-small)。模型及其权重遵循自身许可，项目 MIT 不替代第三方许可。
+- `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`：原 MySQL 数据库连接。
+- `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`：原聊天模型，默认模型名保留 `qwen-vl-max`。
+- `TOOL_API_KEY`、`TOOL_BASE_URL`、`TOOL_MODEL`：原工具选择和天气城市提取模型，模型名保留 `qwen-max-latest`；工具 key/base URL 留空时沿用聊天配置。
+- `BOCHA_API_KEY`、`BOCHA_SEARCH_URL`：原博查联网搜索。
+- `WEATHER_APPCODE`、`WEATHER_HOST`、`WEATHER_PATH`：原阿里云市场易源天气服务。
+- `CORS_ORIGINS`：逗号分隔的前端来源，默认保留原来的 `*`。
 
-## 接口约定
+没有把历史密钥和数据库口令带入源码或示例配置。服务商的模型可用性、套餐及额度由自己的账户决定。聊天沿用原逻辑，会先调用工具选择模型，再按需要调用天气、联网、校园检索和回答模型。
 
-请求体和响应均为 JSON（图片文件上传除外）。路径保留原名称；鉴权是必要的不兼容修复：登录现在返回 token，后续接口需 `Authorization: Bearer <access_token>`。账户隔离依据 token，不能再通过请求里的 `username` 访问其他人的资料。`username` 若提供，必须为本人。
+## 准备原 MySQL 表
 
-| 方法与路径 | 请求 | 成功响应 |
-| --- | --- | --- |
-| `GET /health` | 无需登录 | 模型配置、知识索引和功能状态 |
-| `POST /zhuce` | `{username,password}`，用户名 2–32 字，字母数字、中文、`_ . -`；密码 8–128 字 | `true`，重名 409 |
-| `POST /login` | `{username,password}` | `{access_token,token_type,username,expires_in}`，错误 401 |
-| `POST /logout` | 无请求体，需 token | 撤销当前 token |
-| `POST /history` | `{}` 或 `{username}` | `{history:[{session_id,created_at}]}` |
-| `POST /get_conversation` | `{session_id}` | `{session_id,messages:[{type,content,picture?}],pictures:[...]}` |
-| `POST /upload` | multipart `file`；可选 query `con_id` | JSON 字符串形式的会话 ID |
-| `POST /sdk_run` | `{text,con_id?,imggg?,iswifi?}` | NDJSON 流，见下文 |
-| `POST /get-avatar` | `{}` 或 `{username}` | `{username,base64}`，未设置时 `null` |
-| `POST /upload-avatar` | `{image,username?}`，image 为 data URL | `{message}` |
-
-图片限 JPEG/PNG/WebP、5 MiB，校验媒体类型和文件头。上传图片后用返回的 `con_id` 调用 `/sdk_run`，并设置 `imggg:true`。图片 data URL 会随本次完整回答存入对应用户的会话历史；前端历史中的 `picture` 可直接显示。同会话已有回答在生成时，新的提问和图片上传返回 409。
-
-聊天按行返回 UTF-8 JSON：
-
-```json
-{"response":"增量文本"}
-{"response":"后续文本"}
-{"done":true,"con_id":"会话 ID","sources":[{"source":"demo-campus.txt","score":0.5}]}
-```
-
-发生上游错误时，流中返回 `{error,con_id}`，本轮不保存。客户端应区分 `error` 与 `done`，不能把 HTTP 200 当作回答完整。客户端提交的旧 `history` 和 `pichistory` 字段仅为兼容接收，不作为可信历史；历史以服务端记录为准。旧 `conversations` / `picconversations` 字段保留，但值改为 JSON 字符串，不再提供 Python 表达式；新客户端使用 `messages`。
-
-原型中的第三方天气和联网搜索没有带入历史密钥，当前没有配置实现；`iswifi:true` 明确返回 503，`/health` 标识这两项不可用。普通聊天、校园资料问答与图片问答仍可按上述方式使用。没有接入真实教务系统或个人课程表。
-
-## 安全范围与验证
-
-密码使用带独立随机盐的 PBKDF2-HMAC-SHA256（600,000 次）保存；随机 bearer token 在数据库仅保存 SHA-256 摘要，可过期和退出撤销。会话、头像及图片操作检查资源所属用户。这里没有管理员角色或 RBAC，也未实现短信验证、密码重置、登录限速、审计系统或多实例会话并发协调。当前按单进程运行，请勿使用多个 worker 承担同一会话的并发写入；会话锁仅在当前进程内生效。该整理版仍是校园项目原型，公开部署前需自行补充运营所需能力、HTTPS 和备份策略。
-
-运行离线测试：
+安装并启动 MySQL。以有建库权限的账户为例，在 `backend/` 目录运行；命令会交互式询问自己的密码：
 
 ```powershell
-.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe -m pytest -q
+mysql -u root -p --execute="CREATE DATABASE IF NOT EXISTS web CHARACTER SET utf8mb4;"
+mysql -u root -p --database=web --execute="source schema.sql"
 ```
 
-测试使用临时 SQLite 数据库、临时知识索引及假的模型流，覆盖注册登录、token 失效、跨用户访问拒绝、图片校验、完整流保存及失败不保存，不调用付费 API。已在 Python 3.12 上验证默认 SQLite/离线检索流程；没有连接真实 MySQL、调用服务商模型或下载 m3e 权重验证。鉴权头的标准形式见 [FastAPI 安全文档](https://fastapi.tiangolo.com/tutorial/security/)。
+`DB_NAME` 使用其他名称时，相应调整命令。`schema.sql` 根据原 SQL 补齐 `user`、`user-session`、`conversations` 三张表及原代码用到的列。现有数据库应先自行核对结构；脚本不迁移原有数据。
+
+## 准备原模型、知识资料与头像
+
+路径相对于 `backend/` 解析，也可以在 `.env` 中使用绝对路径：
+
+| 配置 | 原默认路径 | 所需内容 |
+| --- | --- | --- |
+| `EMBEDDING_MODEL_PATH` | `m3e-small` | 原 m3e-small 本地模型目录 |
+| `KNOWLEDGE_DIR` | `linces` | 自己有权使用的 UTF-8 `.txt` 校园资料 |
+| `INDEX_DIR` | `camp` | 用下面命令在本机生成的 FAISS 索引 |
+| `AVATAR_PATH` | `nailong.png` | 注册账户时读取的默认头像文件 |
+
+模型、校园知识资料和索引不随源码公开分发。默认头像 `nailong.png` 已从原包原样保留。已有原项目资源可在本机继续使用；缺少模型时，可根据 [m3e-small 官方模型说明](https://huggingface.co/moka-ai/m3e-small) 自行取得模型，并遵守模型许可。素材权利归属见[素材说明](../docs/ASSETS.md)。
+
+准备好模型和至少一份 `.txt` 后，显式运行原来的建库函数：
+
+```powershell
+.venv\Scripts\python.exe lang.py
+```
+
+原 `faiss_vector()` 的切分参数仍是 `chunk_size=200`、`chunk_overlap=10`、句号分隔，原 `HuggingFaceEmbeddings`、`FAISS.from_documents`、`save_local` 及 `similarity_search(k=5)` 均保留。此次仅把导入 `lang.py` 时自动建库改为上述显式入口，避免每次启动都覆盖索引。知识资料更新后重新执行该命令。
+
+原 `FAISS.load_local(..., allow_dangerous_deserialization=True)` 保留，因此 `INDEX_DIR` 应指向自己运行上述命令生成的索引；索引文件不放入公开仓库。
+
+## 启动与原接口
+
+```powershell
+.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+接口文档：<http://127.0.0.1:8000/docs>。原前端配置的后端地址需与此一致。
+
+| 路径 | 原请求和返回 |
+| --- | --- |
+| `POST /login` | `{username,password}` → `true` / `false` |
+| `POST /zhuce` | `{username,password}` → `true` / `false` |
+| `POST /sdk_run` | `{text,con_id,imggg,username,history,pichistory,iswifi}` → 每行 `{"response":"增量文本"}` |
+| `POST /upload` | multipart `file`，可选 query `con_id` → JSON 字符串会话 ID |
+| `POST /upload-avatar` | `{username,image}` → `{message}` |
+| `POST /get-avatar` | `{username}` → `{username,base64}` 或 `{error}` |
+| `POST /history` | `{username}` → `{history:[{session_id,created_at}]}` |
+| `POST /get_conversation` | `{session_id}` → 原 `conversations` / `picconversations` 结构 |
+
+消息和图片历史仍按原实现用 `******` 拼接，登录仍返回布尔值，接口仍依据请求中的用户名和会话 ID 操作数据。原型的口令保存、认证和资源访问方式也原样保留，不能据此宣称具备生产级权限管理。
+
+## 本次验证范围
+
+已检查原文件的配置差异和 Python 语法，并在 Windows / Python 3.12 下完成依赖解析。没有安装并验证完整 PyTorch/FAISS 模型运行环境，没有连接真实 MySQL，也没有调用真实千问、博查或易源付费服务。之前另写实现的测试不属于本目录原实现的验证结果。
+
+可重复执行语法检查，不会导入模型或调用 API：
+
+```powershell
+python -m compileall -q -l .
+```

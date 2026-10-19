@@ -4,7 +4,7 @@
       {{ UserStore.username }}</h1>
     </div>
   </template>
-
+  
   <script setup>
   import { computed } from 'vue';
   import { userInformation } from '@/api/user.js';
@@ -22,10 +22,11 @@
     }
   });
   </script>
-
+  
   <style scoped>
   h1 {
     font-size: 18px;
     color: #333;
   }
   </style>
+  

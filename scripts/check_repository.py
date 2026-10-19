@@ -33,10 +33,15 @@ PLACEHOLDER_PASSWORDS = {"password", "your_password", "change_me", "example_pass
 
 
 def inspect_content(name: str, raw: bytes, issues: list[str]) -> None:
+    suffix = Path(name.removesuffix(" [staged]")).suffix.lower()
+    if suffix == ".ttf":
+        if len(raw) > 10 * 1024 * 1024 or raw[:4] not in (b"\x00\x01\x00\x00", b"true", b"ttcf"):
+            issues.append(f"{name}: unexpected font file; review before publishing")
+        return
     if len(raw) > 5 * 1024 * 1024:
         issues.append(f"{name}: file exceeds 5 MiB; review before publishing")
         return
-    if Path(name.removesuffix(" [staged]")).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".ico"}:
+    if suffix in {".png", ".jpg", ".jpeg", ".webp", ".ico"}:
         return
     try:
         content = raw.decode("utf-8-sig")

@@ -1,79 +1,95 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <router-link to="/" class="brand"><span class="brand-mark">崴</span><span>AI 小崴<small>智能校园助手</small></span></router-link>
-      <Menu />
-      <div class="account-area">
-        <el-button v-if="!user.is_login" type="primary" @click="loginDialog.openDialog()">登录 / 注册</el-button>
-        <template v-else>
-          <Head />
-          <Greeting />
-          <el-button @click="historyDialog.openDialog()">查看历史会话</el-button>
-          <el-button link @click="signOut">退出登录</el-button>
-        </template>
+    
+    <div class="sidebar">
+      <img src = "../assets/static/sdu.png" style="width: 100%;"/>
+      <Menu></Menu>
+      <div class="login-button">
+        <el-button type="primary" :icon="Avatar" @click="openLoginDialog">{{ UserStore.is_login ? '切换账户' : '登录/注册' }}</el-button>
       </div>
-    </aside>
-    <main class="all-content"><router-view /></main>
-    <HistoryDialog ref="historyDialog" />
-    <LoginRegister ref="loginDialog" />
+      <div class="user-head" v-if="UserStore.is_login === true">
+        <Head></Head>
+        <goodeverytime></goodeverytime>
+        <el-button type="primary" @click="handleOpenDialog" class="history">查看历史会话</el-button>
+      </div>
+    </div>
+    <div>
+    
+
+    <!-- 使用 HistoryDialog 组件 -->
+    <HistoryDialog
+      ref="historyDialog"
+      :username="username"
+      @select-session="handleSelectSession"
+    />
+  </div>
+    <div class="all-content">
+      <router-view />
+    </div>
+
+    <!-- 使用 LoginRegister 组件 -->
+    <LoginRegister ref="loginRegisterRef" />
+
   </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
-import Menu from './menu.vue'
-import LoginRegister from './LoginRegister.vue'
-import HistoryDialog from './HistoryDialog.vue'
-import Head from './head.vue'
-import Greeting from './goodeverytime.vue'
-import { userInformation } from '@/api/user.js'
-import { useChatStore } from '@/api/counter.js'
-import { apiRequest } from '@/api/client.js'
+import { ref } from 'vue';
+import { Avatar } from '@element-plus/icons-vue';
+import Menu from '@/LayoutMenu/menu.vue';
+import LoginRegister from './LoginRegister.vue'; // 引入 LoginRegister 组件
+import Head from './head.vue';
+import { userInformation } from '@/api/user.js';
+import goodeverytime from './goodeverytime.vue';
+const UserStore = userInformation();
+const loginRegisterRef = ref(null);
+import HistoryDialog from './HistoryDialog.vue'; // 引入对话框组件
 
-const user = userInformation()
-const chat = useChatStore()
-const loginDialog = ref(null)
-const historyDialog = ref(null)
-function logout() {
-  chat.reset()
-  user.logout()
-  historyDialog.value?.closeDialog()
-}
-async function signOut() {
-  const token = user.access_token
-  logout()
-  try {
-    await apiRequest('/logout', { auth: false, json: {}, headers: { Authorization: `Bearer ${token}` } })
-  } catch { /* Local logout still succeeds if the server cannot be reached. */ }
-}
-onMounted(() => {
-  if (user.is_login) user.fetchAvatar()
-  window.addEventListener('session-expired', logout)
-})
-onUnmounted(() => window.removeEventListener('session-expired', logout))
+// 数据
+const username = UserStore.username; // 替换为实际的用户名
+const historyDialog = ref(null);
+
+// 打开对话框
+const handleOpenDialog = () => {
+  if (historyDialog.value) {
+    historyDialog.value.openDialog(); // 调用子组件的方法
+  }
+};
+
+// 处理选择的会话
+const handleSelectSession = (sessionId) => {
+  console.log('在主组件中处理选择的会话ID:', sessionId);
+  // 这里可以处理会话选择后的逻辑
+};
+// 打开登录/注册弹窗
+const openLoginDialog = () => {
+  loginRegisterRef.value.openDialog();
+};
 </script>
 
 <style scoped>
-.layout { min-height: 100vh; }
-.sidebar { width: 200px; box-sizing: border-box; position: fixed; inset: 0 auto 0 0; background: #ffffffb0; padding: 24px 10px; overflow-y: auto; z-index: 10; }
-.brand { display: flex; align-items: center; gap: 10px; margin: 0 8px 28px; color: #254b70; font-size: 21px; font-weight: 700; text-decoration: none; }
-.brand small { display: block; font-size: 11px; margin-top: 4px; font-weight: 400; }
-.brand-mark { display: grid; place-items: center; background: #3a71e8; color: white; border-radius: 13px; width: 43px; height: 43px; }
-.account-area { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 32px; }
-.account-area .el-button { margin-left: 0; }
-.all-content { margin-left: 200px; min-height: 100vh; }
-@media (max-width: 700px) {
-  .sidebar { width: 150px; padding: 18px 4px; }
-  .brand { gap: 5px; font-size: 17px; margin: 0 6px 18px; }
-  .brand-mark { width: 34px; height: 34px; }
-  .all-content { margin-left: 150px; }
+.layout {
+  display: flex;
 }
-@media (max-width: 480px) {
-  .sidebar { width: 120px; }
-  .brand-mark { display: none; }
-  .all-content { margin-left: 120px; }
-  .account-area { padding-top: 20px; }
-  .account-area :deep(.el-button) { max-width: 110px; padding: 8px; }
-  .account-area :deep(h1) { font-size: 13px; }
+.sidebar {
+  width: 200px;
+  position: fixed;
+}
+.all-content {
+  margin-left: 200px;
+  width: 100%;
+}
+.login-button {
+  padding: 10px;
+}
+.user-head {
+  width: 100%;
+  height: 100px;
+  z-index: 9999;
+  padding: 10px;
+}
+.history {
+  padding: 10px;
+  z-index: 599;
 }
 </style>
