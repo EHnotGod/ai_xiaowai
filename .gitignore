@@ -1,0 +1,51 @@
+# Original archives and local inspection material
+*.zip
+.work/
+
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# JavaScript
+node_modules/
+dist/
+.vite/
+coverage/
+*.log
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# Databases, downloaded models, and generated indexes
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.bin
+*.safetensors
+*.faiss
+*.pkl
+backend/data/
+backend/models/
+backend/knowledge/local/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

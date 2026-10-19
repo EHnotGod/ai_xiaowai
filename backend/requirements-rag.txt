@@ -1,0 +1,4 @@
+# Optional semantic retrieval. PyTorch/model weights are downloaded separately.
+-r requirements.txt
+langchain-huggingface>=0.1,<2
+sentence-transformers>=3,<6
